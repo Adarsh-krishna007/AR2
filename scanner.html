@@ -1,161 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Landmark Scanner</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 20px;
-    }
-    #camera {
-      width: 100%;
-      max-width: 600px;
-      margin-bottom: 20px;
-    }
-    #scannerBtn {
-      background-color: #4CAF50;
-      color: white;
-      padding: 10px 20px;
-      border: none;
-      cursor: pointer;
-      font-size: 18px;
-    }
-    #scannerBtn:disabled {
-      background-color: #aaa;
-    }
-    #landmarkDetails {
-      margin-top: 20px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Scanner</title>
+    <style>
+        #camera {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            margin: 20px auto;
+        }
+        #scanner-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #8967B3;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #landmark-details {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #E6D9A2;
+            display: none;
+        }
+    </style>
 </head>
 <body>
+    <div>
+        <video id="camera" autoplay></video>
+        <button id="scanner-button">Scan</button>
+        <div id="landmark-details"></div>
+    </div>
 
-  <h1>Landmark Scanner</h1>
-  <video id="camera" autoplay></video>
-  <br>
-  <button id="scannerBtn" disabled>Scan</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/resemble.js/1.3.0/resemble.min.js"></script>
+    <script>
+        const video = document.getElementById('camera');
+        const scannerButton = document.getElementById('scanner-button');
+        const landmarkDetails = document.getElementById('landmark-details');
+        let landmarks = [];
 
-  <div id="landmarkDetails"></div>
+        // Get user camera stream
+        async function initCamera() {
+            let constraints = {
+                video: { facingMode: { ideal: 'environment' } } // Try to access the back camera first
+            };
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/2.6.0/tf.min.js"></script>
-  <script>
-    const videoElement = document.getElementById('camera');
-    const scannerBtn = document.getElementById('scannerBtn');
-    const landmarkDetails = document.getElementById('landmarkDetails');
-
-    let stream;
-
-    // Function to open the back or front camera
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }
-        });
-      } catch (error) {
-        // If back camera is not found, use front camera
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" }
-        });
-      }
-      videoElement.srcObject = stream;
-      scannerBtn.disabled = false; // Enable scanner button once the camera starts
-    }
-
-    // Start the camera when the page loads
-    window.onload = () => {
-      startCamera();
-    };
-
-    // Function to take a snapshot from the video
-    function takeSnapshot() {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
-      const context = canvas.getContext('2d');
-      context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg');
-    }
-
-    // Function to scan the image and check against the JSON data
-    async function scanImage() {
-      const imageData = takeSnapshot();
-      const scannedImage = new Image();
-      scannedImage.src = imageData;
-
-      // Fetch JSON data (landmarks)
-      const response = await fetch('db.json');
-      const landmarks = await response.json();
-
-      let found = false;
-
-      // Compare the scanned image to each landmark image using a basic method (use more robust techniques in practice)
-      for (const landmark of landmarks) {
-        const landmarkImage = new Image();
-        landmarkImage.crossOrigin = "Anonymous"; // Handle cross-origin issue
-        landmarkImage.src = landmark.image;
-
-        // Wait for both images to load before comparing them
-        await new Promise((resolve) => (landmarkImage.onload = resolve));
-
-        // Use a basic comparison to see if images match (this needs a more sophisticated approach)
-        if (compareImages(scannedImage, landmarkImage)) {
-          displayLandmarkDetails(landmark);
-          found = true;
-          break;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+            } catch (error) {
+                // If back camera is not available, fall back to the front camera
+                constraints = {
+                    video: { facingMode: 'user' }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+            }
         }
-      }
 
-      if (!found) {
-        // Perform TensorFlow object detection if no landmark is found
-        detectObject();
-      }
-    }
+        // Fetch the landmarks database
+        async function fetchLandmarks() {
+            try {
+                const response = await fetch('db.json'); // Ensure db.json is accessible
+                landmarks = await response.json();
+            } catch (error) {
+                console.error('Error fetching landmarks:', error);
+            }
+        }
 
-    // Function to display the landmark details
-    function displayLandmarkDetails(landmark) {
-      landmarkDetails.innerHTML = `
-        <h2>${landmark.landmark}</h2>
-        <p><strong>State:</strong> ${landmark.state}</p>
-        <p><strong>City:</strong> ${landmark.city}</p>
-        <p><strong>Locality:</strong> ${landmark.locality}</p>
-        <img src="${landmark.image}" alt="${landmark.landmark}" style="width: 300px;">
-      `;
-    }
+        // Function to scan the image from the video feed and compare with the db.json
+        async function scanImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL(); // Example of captured frame
 
-    // Compare images (placeholder function; improve with a better algorithm)
-    function compareImages(img1, img2) {
-      return img1.src === img2.src; // Basic comparison (use pixel-based comparison for better accuracy)
-    }
+            let matchedLandmark = null;
 
-    // TensorFlow object detection function
-    async function detectObject() {
-      landmarkDetails.innerHTML = '<p>Performing object detection...</p>';
+            // Compare with each landmark image
+            for (const landmark of landmarks) {
+                await compareImages(imageData, landmark.image)
+                    .then(result => {
+                        if (result.rawMisMatchPercentage < 10) { // Set a threshold for matching
+                            matchedLandmark = landmark;
+                        }
+                    });
+                if (matchedLandmark) break; // Exit loop if a match is found
+            }
 
-      // Load a pre-trained model for object detection
-      const model = await tf.loadGraphModel('https://tfhub.dev/tensorflow/ssd_mobilenet_v2/1/default/1');
+            if (matchedLandmark) {
+                showLandmarkDetails(matchedLandmark);
+            } else {
+                // If no match found, perform TensorFlow object detection (to be implemented)
+                alert("No matching landmark found. Performing TensorFlow object detection...");
+            }
+        }
 
-      // Process the current video frame (this requires TensorFlow.js-specific code)
-      const canvas = document.createElement('canvas');
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
-      const context = canvas.getContext('2d');
-      context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      const input = tf.browser.fromPixels(canvas);
+        // Function to compare images
+        function compareImages(capturedImage, landmarkImage) {
+            return new Promise((resolve) => {
+                resemble(capturedImage)
+                    .compareTo(landmarkImage)
+                    .onComplete((data) => {
+                        resolve(data);
+                    });
+            });
+        }
 
-      // Perform object detection using the loaded model
-      const predictions = await model.executeAsync(input.expandDims(0));
+        // Show landmark details
+        function showLandmarkDetails(landmark) {
+            landmarkDetails.style.display = 'block';
+            landmarkDetails.innerHTML = `
+                <h3>Landmark: ${landmark.landmark}</h3>
+                <p>State: ${landmark.state}</p>
+                <p>City: ${landmark.city}</p>
+                <p>Locality: ${landmark.locality}</p>
+                <img src="${landmark.image}" alt="${landmark.landmark}" width="100%">
+            `;
+        }
 
-      // Show results (this is a placeholder, you need to parse predictions correctly)
-      landmarkDetails.innerHTML = '<p>No landmark found, detected objects: ' + predictions + '</p>';
-    }
+        // Initialize camera and fetch landmarks on page load
+        window.onload = async () => {
+            await fetchLandmarks();
+            initCamera();
+        };
 
-    // Add event listener to scanner button
-    scannerBtn.addEventListener('click', scanImage);
-
-  </script>
-
+        // Add event listener for the scanner button
+        scannerButton.addEventListener('click', scanImage);
+    </script>
 </body>
 </html>

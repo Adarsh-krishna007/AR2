@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Camera with Object Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
         #camera {
             width: 100%;
@@ -63,12 +65,25 @@
 
     startCamera();
 
-    // Load the JSON database (db.json)
+    // Load the JSON database (landmark.json)
     async function fetchMonumentData() {
-        const response = await fetch('landmark.json');
-        const data = await response.json();
-        return data.monuments;
+        try {
+            const response = await fetch('landmark.json');
+            if (!response.ok) throw new Error("Could not fetch landmark data");
+            const data = await response.json();
+            return data.monuments;
+        } catch (error) {
+            console.error("Error loading monument data:", error);
+            return [];
+        }
     }
+
+    // Load TensorFlow COCO-SSD model for object detection
+    let model;
+    async function loadObjectDetectionModel() {
+        model = await cocoSsd.load();
+    }
+    loadObjectDetectionModel(); // Load the model initially
 
     // Scan button action
     scannerBtn.addEventListener('click', async () => {
@@ -82,14 +97,11 @@
 
         // Fetch JSON data and try to find a matching image
         const monuments = await fetchMonumentData();
-
         let foundMatch = false;
 
         for (let monument of monuments) {
-            // In a real project, you would use image comparison here.
-            // For simplicity, we'll assume the image filenames are unique and directly check for similarity.
-            if (await compareImages(monument.image, capturedImage)) {
-                // Show monument details
+            // Compare images based on filenames for simplicity
+            if (capturedImage.includes(monument.image)) {
                 detailsDiv.innerHTML = `
                     <h3>${monument.name}</h3>
                     <p><strong>Location:</strong> ${monument.location}</p>
@@ -101,18 +113,21 @@
         }
 
         if (!foundMatch) {
-            // If no match, do normal object detection using TensorFlow
+            // If no match found, perform object detection using TensorFlow.js
             detailsDiv.innerHTML = `<p>No matching landmark found, performing object detection...</p>`;
-            // Here you would call a TensorFlow model for object detection.
+            const predictions = await model.detect(video);
+
+            // Display detected objects with confidence
+            if (predictions.length > 0) {
+                detailsDiv.innerHTML = '<h3>Detected Objects:</h3>';
+                predictions.forEach(prediction => {
+                    detailsDiv.innerHTML += `<p>${prediction.class} - ${Math.round(prediction.score * 100)}% confidence</p>`;
+                });
+            } else {
+                detailsDiv.innerHTML = `<p>No objects detected.</p>`;
+            }
         }
     });
-
-    // Placeholder for image comparison logic
-    async function compareImages(jsonImage, capturedImage) {
-        // Ideally, you would use an image comparison algorithm or model here.
-        // This is a placeholder function where you can add your own logic.
-        return jsonImage.includes("taj.jpeg");  // Simplified match for demonstration
-    }
 </script>
 
 </body>

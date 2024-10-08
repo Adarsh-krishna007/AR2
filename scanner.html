@@ -24,6 +24,11 @@
             margin-top: 20px;
             font-size: 1.2em;
         }
+        #loading {
+            display: none;
+            font-size: 1.2em;
+            color: #4CAF50;
+        }
     </style>
 </head>
 <body>
@@ -31,6 +36,7 @@
 <div>
     <video id="camera" autoplay></video>
     <button id="scannerBtn" disabled>Scan</button>
+    <div id="loading">Processing...</div>
     <div id="details"></div>
 </div>
 
@@ -38,6 +44,7 @@
     const video = document.getElementById('camera');
     const scannerBtn = document.getElementById('scannerBtn');
     const detailsDiv = document.getElementById('details');
+    const loadingDiv = document.getElementById('loading');
 
     // Wait for OpenCV to load
     function onOpenCvReady() {
@@ -48,21 +55,15 @@
     // Access the back camera or fallback to the front camera
     async function startCamera() {
         const constraints = {
-            video: {
-                facingMode: { exact: "environment" }
-            }
+            video: { facingMode: { exact: "environment" } }
         };
-        
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
         } catch (err) {
-            // If back camera is not available, use the front camera
-            const frontCameraConstraints = {
-                video: {
-                    facingMode: "user"
-                }
-            };
+            console.warn("Back camera not available, using front camera.");
+            const frontCameraConstraints = { video: { facingMode: "user" } };
             const stream = await navigator.mediaDevices.getUserMedia(frontCameraConstraints);
             video.srcObject = stream;
         }
@@ -84,51 +85,47 @@
     }
 
     // Function to compare images using ORB (OpenCV)
-    function compareImages(capturedImg, monumentImgSrc, callback) {
-        // Load the monument image from JSON
-        let imgElement = new Image();
-        imgElement.src = monumentImgSrc;
-        imgElement.onload = function() {
-            let src1 = cv.imread(capturedImg);  // Read captured image
-            let src2 = cv.imread(imgElement);   // Read monument image
+    async function compareImages(capturedImg, monumentImgSrc) {
+        return new Promise((resolve) => {
+            let imgElement = new Image();
+            imgElement.src = monumentImgSrc;
+            imgElement.onload = function() {
+                let src1 = cv.imread(capturedImg);
+                let src2 = cv.imread(imgElement);
 
-            let orb = new cv.ORB();
+                let orb = new cv.ORB();
+                let keypoints1 = new cv.KeyPointVector();
+                let keypoints2 = new cv.KeyPointVector();
+                let descriptors1 = new cv.Mat();
+                let descriptors2 = new cv.Mat();
 
-            // Keypoint detection and descriptor extraction
-            let keypoints1 = new cv.KeyPointVector();
-            let keypoints2 = new cv.KeyPointVector();
-            let descriptors1 = new cv.Mat();
-            let descriptors2 = new cv.Mat();
+                orb.detectAndCompute(src1, new cv.Mat(), keypoints1, descriptors1);
+                orb.detectAndCompute(src2, new cv.Mat(), keypoints2, descriptors2);
 
-            orb.detectAndCompute(src1, new cv.Mat(), keypoints1, descriptors1);
-            orb.detectAndCompute(src2, new cv.Mat(), keypoints2, descriptors2);
+                let bf = new cv.BFMatcher(cv.NORM_HAMMING, true);
+                let matches = new cv.DMatchVector();
+                bf.match(descriptors1, descriptors2, matches);
 
-            // Match the descriptors
-            let bf = new cv.BFMatcher(cv.NORM_HAMMING, true);
-            let matches = new cv.DMatchVector();
+                src1.delete();
+                src2.delete();
+                keypoints1.delete();
+                keypoints2.delete();
+                descriptors1.delete();
+                descriptors2.delete();
+                matches.delete();
 
-            bf.match(descriptors1, descriptors2, matches);
-
-            // Check if enough matches are found to consider it a valid match
-            if (matches.size() > 10) {
-                callback(true);  // Images are considered similar
-            } else {
-                callback(false);  // Not a valid match
-            }
-
-            // Clean up
-            src1.delete();
-            src2.delete();
-            keypoints1.delete();
-            keypoints2.delete();
-            descriptors1.delete();
-            descriptors2.delete();
-            matches.delete();
-        };
+                resolve(matches.size() > 10);
+            };
+        });
     }
 
     // Scan button action
     scannerBtn.addEventListener('click', async () => {
+        // Disable the button and show loading text
+        scannerBtn.disabled = true;
+        loadingDiv.style.display = 'block';
+        detailsDiv.innerHTML = '';
+
         // Capture image from video stream
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -136,30 +133,31 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const capturedImage = new Image();
-        capturedImage.src = canvas.toDataURL('image/jpeg');
-
+        const capturedImage = canvas.toDataURL('image/jpeg');
+        
         // Fetch JSON data and try to find a matching image
         const monuments = await fetchMonumentData();
         let foundMatch = false;
 
         for (let monument of monuments) {
-            compareImages(capturedImage, monument.image, (isMatch) => {
-                if (isMatch) {
-                    detailsDiv.innerHTML = `
-                        <h3>${monument.name}</h3>
-                        <p><strong>Location:</strong> ${monument.location}</p>
-                        <p><strong>Description:</strong> ${monument.description}</p>
-                    `;
-                    foundMatch = true;
-                    return;
-                }
-            });
+            if (await compareImages(capturedImage, monument.image)) {
+                detailsDiv.innerHTML = `
+                    <h3>${monument.name}</h3>
+                    <p><strong>Location:</strong> ${monument.location}</p>
+                    <p><strong>Description:</strong> ${monument.description}</p>
+                `;
+                foundMatch = true;
+                break; // Exit loop on first match
+            }
         }
 
         if (!foundMatch) {
             detailsDiv.innerHTML = `<p>No matching landmark found.</p>`;
         }
+
+        // Re-enable the button and hide loading text
+        scannerBtn.disabled = false;
+        loadingDiv.style.display = 'none';
     });
 
 </script>

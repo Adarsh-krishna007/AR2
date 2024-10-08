@@ -1,0 +1,40 @@
+{
+    "monuments": [
+      {
+        "id": 1,
+        "name": "Taj Mahal",
+        "location": "Agra, Uttar Pradesh",
+        "description": "The Taj Mahal, an ivory-white marble mausoleum, was built by Mughal Emperor Shah Jahan in memory of his beloved wife, Mumtaz Mahal. It is a UNESCO World Heritage site and one of the Seven Wonders of the World.",
+        "image": "taj.jpeg"
+      },
+      {
+        "id": 2,
+        "name": "Qutub Minar",
+        "location": "Delhi",
+        "description": "Qutub Minar is a 73-meter tall tapering tower of victory, built in 1193 by Qutb-ud-din Aibak. It is a UNESCO World Heritage site and one of the tallest brick minarets in the world.",
+        "image": "https://example.com/images/qutub_minar.jpg"
+      },
+      {
+        "id": 3,
+        "name": "Gateway of India",
+        "location": "Mumbai, Maharashtra",
+        "description": "The Gateway of India is an iconic arch monument built in the early 20th century in Mumbai. It was erected to commemorate the landing of King George V and Queen Mary in India in 1911.",
+        "image": "https://example.com/images/gateway_of_india.jpg"
+      },
+      {
+        "id": 4,
+        "name": "Red Fort",
+        "location": "Delhi",
+        "description": "The Red Fort is a historic fortification in the heart of Delhi, built by Mughal Emperor Shah Jahan in 1648. It served as the main residence of the Mughal emperors and is now a UNESCO World Heritage site.",
+        "image": "https://example.com/images/red_fort.jpg"
+      },
+      {
+        "id": 5,
+        "name": "Hampi",
+        "location": "Karnataka",
+        "description": "Hampi is an ancient village known for its ruins of the medieval Vijayanagara Empire. It is a UNESCO World Heritage site, housing temples, palaces, and sculptures.",
+        "image": "https://example.com/images/hampi.jpg"
+      }
+    ]
+  }
+  
